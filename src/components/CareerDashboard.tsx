@@ -4,9 +4,9 @@ import { getTeamById } from '../data/nbaTeams';
 import { simulateSeason, playAudioEffect, EXPANDED_CAREER_EVENTS } from '../utils/simulator';
 import { CAREER_EVENTS } from '../data/nbaEvents';
 import { EventModal } from './EventModal';
-import { OffseasonDecisionModal } from './OffseasonDecisionModal';
 import { LifestyleStoreModal } from './LifestyleStoreModal';
 import { Trophy, Star, Award, Zap, Play, Calendar, DollarSign, Flame, ShieldCheck, Heart, Sparkles, Building, UserCheck, ArrowUpRight, FastForward, Medal, History } from 'lucide-react';
+import { QuickStartOffseasonModal } from './QuickStartOffseasonModal';
 
 interface CareerDashboardProps {
   player: Player;
@@ -32,13 +32,22 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({
   onUpdateTrophyCase,
 }) => {
   const [activeEvent, setActiveEvent] = useState<CareerEvent | null>(null);
-  const [showOffseasonModal, setShowOffseasonModal] = useState(false);
   const [showLifestyleStore, setShowLifestyleStore] = useState(false);
+  
+  // Quick Start offseason state
+  const [offseasonResult, setOffseasonResult] = useState<{
+    newOvr: number;
+    earningsGained: number;
+    wonChampionship: boolean;
+    wonMvp: boolean;
+    wonAllStar: boolean;
+    updatedPlayer: Player;
+  } | null>(null);
 
   const currentTeam = getTeamById(player.currentTeamId);
   const latestSeason = careerHistory.length > 0 ? careerHistory[careerHistory.length - 1] : null;
 
-  // Single Season Simulation
+  // Single Season Simulation - COPERO STYLE
   const handleSimulateSingleSeason = () => {
     playAudioEffect('badge');
 
@@ -47,14 +56,19 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({
     onAddSeasonHistory(result.stats);
     onUpdateTrophyCase(result.updatedTrophyCase);
 
-    let updatedPlayer: Player = {
+    const wonChampionship = result.stats.awardsWon?.some((a: string) => a.includes('Campeón')) ?? false;
+    const wonMvp = result.stats.awardsWon?.some((a: string) => a.includes('MVP')) ?? false;
+
+    if (wonChampionship) playAudioEffect('championship');
+    else if (wonMvp) playAudioEffect('allstar');
+
+    const updatedPlayer: Player = {
       ...player,
       age: player.age + 1,
-      ovr: result.newOvr,  // Apply realistic OVR progression
+      ovr: result.newOvr,
       earningsMillions: player.earningsMillions + result.earnedIncomeMillions,
       currentTeamId: result.wasTraded && result.newTeamId ? result.newTeamId : player.currentTeamId,
       contractYearsRemaining: Math.max(0, player.contractYearsRemaining - 1),
-      // Track synced attributes & durability loss from injuries
       attributes: result.injuryOccurred
         ? { ...(result.updatedAttributes || player.attributes), durability: Math.max(40, ((result.updatedAttributes || player.attributes)?.durability ?? 75) - 3) }
         : (result.updatedAttributes || player.attributes),
@@ -62,21 +76,16 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({
 
     onUpdatePlayer(updatedPlayer);
 
-    // Play special sounds for achievements
-    if (result.stats.awardsWon?.some((a: string) => a.includes('Campeón'))) {
-      playAudioEffect('championship');
-    } else if (result.stats.awardsWon?.some((a: string) => a.includes('All-Star'))) {
-      playAudioEffect('allstar');
-    }
-
-    // Trigger career event (50% chance, using expanded events pool)
-    const availableEvents = EXPANDED_CAREER_EVENTS.filter(e => !player.completedEventIds.includes(e.id));
-    if (availableEvents.length > 0 && Math.random() < 0.50) {
-      const selectedEv = availableEvents[Math.floor(Math.random() * availableEvents.length)];
-      setActiveEvent(selectedEv);
-    } else {
-      setShowOffseasonModal(true);
-    }
+    // COPERO STYLE: Show simple binary choice modal
+    const wonAllStar = result.stats.awardsWon?.some((a: string) => a.includes('All-Star')) ?? false;
+    setOffseasonResult({
+      newOvr: result.newOvr,
+      earningsGained: result.earnedIncomeMillions,
+      wonChampionship,
+      wonMvp,
+      wonAllStar,
+      updatedPlayer,
+    });
   };
 
   // Handle Event Choice Completion
@@ -123,13 +132,12 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({
 
     onUpdatePlayer(updatedPlayer);
     setActiveEvent(null);
-    setShowOffseasonModal(true);
   };
 
-  // Handle Offseason Decision Finish
+  // Handle Offseason complete from Copero-style modal
   const handleOffseasonComplete = (updatedPlayer: Player) => {
     onUpdatePlayer(updatedPlayer);
-    setShowOffseasonModal(false);
+    setOffseasonResult(null);
     onAdvanceSeasonYear();
   };
 
@@ -143,7 +151,12 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({
             <img src={currentTeam.logoUrl} alt={currentTeam.name} className="w-full h-full object-contain" />
           </div>
           <div className="flex-1 text-center sm:text-left">
-            <h1 className="font-display font-black text-2xl sm:text-3xl text-white uppercase leading-tight">{player.name}</h1>
+            <h1 className="font-display font-black text-2xl sm:text-3xl text-white uppercase leading-tight flex items-center gap-2">
+              {player.name}
+              <span className="font-display font-black text-xl text-amber-400 bg-slate-900 border border-amber-500/40 rounded-lg px-2 py-0.5">
+                #{player.jerseyNumber ?? '?'}
+              </span>
+            </h1>
             <div className="text-xs text-slate-400 font-semibold flex items-center gap-2 justify-center sm:justify-start flex-wrap">
               <span>{currentTeam.name}</span>
               <span className="text-slate-600">•</span>
@@ -226,6 +239,7 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-white text-sm">{season.year}</span>
                       <span className="text-slate-500 text-xs">{team.name}</span>
+                      <span className="text-amber-400/60 text-xs">• {season.age} años</span>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-slate-400">
                       <span>PTS {season.ppg}</span>
@@ -269,11 +283,16 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({
         />
       )}
 
-      {showOffseasonModal && latestSeason && (
-        <OffseasonDecisionModal
-          player={player}
-          latestSeason={latestSeason}
-          onDecisionComplete={handleOffseasonComplete}
+      {offseasonResult && (
+        <QuickStartOffseasonModal
+          player={offseasonResult.updatedPlayer}
+          newOvr={offseasonResult.newOvr}
+          earningsGained={offseasonResult.earningsGained}
+          wonChampionship={offseasonResult.wonChampionship}
+          wonMvp={offseasonResult.wonMvp}
+          wonAllStar={offseasonResult.wonAllStar}
+          careerYears={careerHistory.length}
+          onComplete={handleOffseasonComplete}
         />
       )}
 

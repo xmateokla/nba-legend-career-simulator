@@ -205,4 +205,5 @@ export type GamePhase =
   | 'DRAFT_NIGHT' 
   | 'SEASON_DASHBOARD' 
   | 'HALL_OF_FAME' 
-  | 'QUICK_START';
+  | 'QUICK_START'
+  | 'QUICK_DRAFT';

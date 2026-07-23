@@ -4,6 +4,7 @@ import { Navbar } from './components/Navbar';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { ProspectCreator } from './components/ProspectCreator';
 import { QuickStartCreator } from './components/QuickStartCreator';
+import { QuickDraft } from './components/QuickDraft';
 import { CombineTestsScreen } from './components/CombineTestsScreen';
 import { DraftNightScreen } from './components/DraftNightScreen';
 import { CareerDashboard } from './components/CareerDashboard';
@@ -85,13 +86,20 @@ export const App: React.FC = () => {
         {phase === 'QUICK_START' && (
           <QuickStartCreator
             onComplete={createdPlayer => {
-              // Assign a random team for quick start
-              const teamIds = ['lakers', 'celtics', 'warriors', 'bulls', 'heat', 'nuggets', 'suns', 'bucks', 'clippers', 'mavs'];
-              const randomTeam = teamIds[Math.floor(Math.random() * teamIds.length)];
+              setPlayer(createdPlayer);
+              setPhase('QUICK_DRAFT');
+            }}
+          />
+        )}
+
+        {phase === 'QUICK_DRAFT' && player && (
+          <QuickDraft
+            player={player}
+            onDraftComplete={teamId => {
               setPlayer({
-                ...createdPlayer,
-                currentTeamId: randomTeam,
-                draftTeamId: randomTeam,
+                ...player,
+                currentTeamId: teamId,
+                draftTeamId: teamId,
               });
               setPhase('SEASON_DASHBOARD');
             }}

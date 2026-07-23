@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player, Position } from '../types/game';
-import { Zap, User, Target, ArrowRight } from 'lucide-react';
+import { Zap, User, Target, ArrowRight, Hash } from 'lucide-react';
 
 interface QuickStartCreatorProps {
   onComplete: (player: Player) => void;
@@ -17,6 +17,7 @@ const POSITIONS: { id: Position; label: string; icon: string }[] = [
 export const QuickStartCreator: React.FC<QuickStartCreatorProps> = ({ onComplete }) => {
   const [name, setName] = useState('');
   const [position, setPosition] = useState<Position>('PG');
+  const [jerseyNumber, setJerseyNumber] = useState(23);
 
   const handleCreate = () => {
     const newPlayer: Player = {
@@ -32,7 +33,7 @@ export const QuickStartCreator: React.FC<QuickStartCreatorProps> = ({ onComplete
       heightInches: 5,
       weightLbs: 200,
       wingspanInches: 83,
-      jerseyNumber: Math.floor(Math.random() * 99) + 1,
+      jerseyNumber,
       college: 'Duke',
       age: 19,
       ovr: 75,
@@ -122,6 +123,39 @@ export const QuickStartCreator: React.FC<QuickStartCreatorProps> = ({ onComplete
                   <div className="text-xs font-bold">{pos.label}</div>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Jersey Number */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-300 uppercase flex items-center gap-2">
+              <Hash className="w-4 h-4 text-amber-400" />
+              Número de Dorsal
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min="0"
+                max="99"
+                value={jerseyNumber}
+                onChange={e => setJerseyNumber(parseInt(e.target.value) || 0)}
+                className="w-24 bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-white font-bold text-2xl text-center focus:border-amber-400 outline-none"
+              />
+              <div className="flex flex-wrap gap-2">
+                {[0, 1, 3, 8, 11, 13, 21, 23, 24, 30, 33].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setJerseyNumber(n)}
+                    className={`w-10 h-10 rounded-xl border text-sm font-bold transition-all ${
+                      jerseyNumber === n
+                        ? 'border-amber-400 bg-amber-500/20 text-amber-400'
+                        : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-600'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

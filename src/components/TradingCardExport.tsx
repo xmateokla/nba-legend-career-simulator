@@ -1,8 +1,8 @@
-import React, { useRef } from 'react';
-import { toPng } from 'html-to-image';
+import React from 'react';
 import { Player, TrophyCase, SeasonStats } from '../types/game';
 import { getTeamById } from '../data/nbaTeams';
-import { Trophy, Award, Star, Download, Sparkles, Flame, Shield } from 'lucide-react';
+import { Trophy, Star, Award, Sparkles, RotateCcw, Share2, Download } from 'lucide-react';
+import { playAudioEffect } from '../utils/simulator';
 
 interface TradingCardExportProps {
   player: Player;
@@ -17,130 +17,99 @@ export const TradingCardExport: React.FC<TradingCardExportProps> = ({
   careerStatsHistory,
   onRestart,
 }) => {
-  const cardRef = useRef<HTMLDivElement>(null);
   const currentTeam = getTeamById(player.currentTeamId);
 
-  const handleDownloadImage = async () => {
-    if (!cardRef.current) return;
-    try {
-      const dataUrl = await toPng(cardRef.current, { cacheBust: true, pixelRatio: 2 });
-      const link = document.createElement('a');
-      link.download = `${player.name.replace(/\s+/g, '_')}_NBA_Legend_Card.png`;
-      link.href = dataUrl;
-      link.click();
-    } catch (err) {
-      console.error('Error downloading card image:', err);
-    }
-  };
+  // Total career points calculation
+  const totalCareerPoints = trophyCase.totalPoints;
+  const totalSeasons = careerStatsHistory.length;
+  const avgPpg = totalSeasons > 0 ? (totalCareerPoints / (totalSeasons * 76)).toFixed(1) : '0.0';
 
-  const isHof = trophyCase.hallOfFameChance >= 65 || trophyCase.regularMvp > 0 || trophyCase.championships >= 2;
+  const isHallOfFamer = trophyCase.hallOfFameChance >= 60;
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 my-8 space-y-8 text-center">
+    <div className="max-w-4xl mx-auto p-4 sm:p-8 my-4 text-center space-y-8 animate-fadeIn">
+      
+      {/* Hall of Fame Banner */}
       <div className="space-y-2">
-        <div className="inline-flex items-center gap-2 bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold uppercase px-4 py-1.5 rounded-full">
+        <div className="inline-flex items-center gap-2 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider gold-glow">
           <Sparkles className="w-4 h-4 text-amber-400" />
-          <span>TARJETA DIGITAL DE COLECCIÓN DE LA NBA</span>
+          <span>CARTA OFICIAL DE RETIRO NBA • HALL OF FAME CLASS</span>
         </div>
-        <h2 className="font-display text-4xl sm:text-6xl font-black text-white uppercase">
-          LEGADO INMORTAL DE CARRERA
-        </h2>
-        <p className="text-sm text-slate-400 max-w-md mx-auto">
-          Tu carrera en la NBA ha finalizado. Exporta tu tarjeta holográfica tipo Panini Prizm para guardar y compartir tu historia.
+
+        <h1 className="font-display text-4xl sm:text-6xl font-black text-white uppercase tracking-tight">
+          {isHallOfFamer ? '🏛️ INDUCTEE AL SALÓN DE LA FAMA' : '📜 FIN DE CARRERA PROFESIONAL'}
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto">
+          Resumen definitivo del legado deportivo, trofeos acumulados y estadísticas de por vida de {player.name}.
         </p>
       </div>
 
-      {/* PANINI PRIZM STYLE CARD */}
-      <div className="flex justify-center py-4">
-        <div
-          ref={cardRef}
-          className="w-full max-w-sm bg-slate-950 rounded-3xl p-6 border-4 shadow-2xl relative overflow-hidden text-left space-y-5"
-          style={{
-            borderColor: currentTeam.primaryColor,
-            backgroundImage: `radial-gradient(circle at top right, ${currentTeam.primaryColor}40, #0B0F19 80%)`,
-          }}
-        >
-          {/* Top Shiny Header */}
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="font-display font-black text-2xl tracking-wider text-amber-400">PANINI PRIZM</span>
-              <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-bold uppercase">HOF EDITION</span>
-            </div>
-            <div
-              className="w-10 h-10 rounded-xl p-1 flex items-center justify-center border bg-slate-950/90 shadow-lg"
-              style={{
-                borderColor: currentTeam.secondaryColor,
-              }}
-            >
-              <img src={currentTeam.logoUrl} alt={currentTeam.name} className="w-full h-full object-contain" />
-            </div>
+      {/* 3D HOLOGRAPHIC TRADING CARD */}
+      <div className="max-w-sm mx-auto game-card-gold rounded-3xl p-6 border-2 border-amber-400/80 holographic-edge gold-glow shadow-2xl space-y-5 text-left relative overflow-hidden">
+        
+        {/* Top Card Badge */}
+        <div className="flex items-center justify-between border-b border-amber-500/30 pb-3">
+          <div className="flex items-center gap-2">
+            <img src={currentTeam.logoUrl} alt={currentTeam.name} className="w-7 h-7 object-contain" />
+            <span className="font-display font-black text-lg text-white uppercase">{currentTeam.name}</span>
           </div>
 
-          {/* Player Graphic Silhouette / Card Center */}
-          <div className="relative rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 p-6 text-center space-y-2 overflow-hidden shadow-inner">
-            <div className="absolute top-2 right-2 text-4xl opacity-20">🏀</div>
-            <div className="font-display text-7xl font-black text-amber-400 leading-none drop-shadow-md">
-              {player.ovr}
-            </div>
-            <div className="text-xs uppercase font-bold text-slate-400 tracking-widest">OVERALL RATING</div>
-            
-            {/* Hall of Fame Badge */}
-            {isHof && (
-              <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-300 text-black px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider shadow-lg animate-pulse">
-                <Star className="w-3.5 h-3.5 fill-black" />
-                <span>HALL OF FAME INDUCTEE 🏛️</span>
-              </div>
-            )}
-          </div>
-
-          {/* Player Identity */}
-          <div>
-            <div className="text-xs text-amber-400 font-bold uppercase tracking-wider">{player.position} • #{player.jerseyNumber}</div>
-            <h3 className="font-display text-4xl font-black text-white uppercase tracking-tight leading-none">{player.name}</h3>
-            <p className="text-xs text-slate-400 font-medium mt-1">Pick #{player.draftPick} del Draft • {player.college}</p>
-          </div>
-
-          {/* Key Stats Summary */}
-          <div className="grid grid-cols-3 gap-2 bg-slate-900/90 border border-slate-800 rounded-2xl p-3 text-center text-xs">
-            <div>
-              <div className="text-slate-400 text-[10px] uppercase font-semibold">ANILLOS</div>
-              <div className="font-display font-black text-xl text-amber-400">💍 {trophyCase.championships}</div>
-            </div>
-            <div>
-              <div className="text-slate-400 text-[10px] uppercase font-semibold">MVP REGULAR</div>
-              <div className="font-display font-black text-xl text-amber-400">🏅 {trophyCase.regularMvp}</div>
-            </div>
-            <div>
-              <div className="text-slate-400 text-[10px] uppercase font-semibold">ALL-STAR</div>
-              <div className="font-display font-black text-xl text-amber-400">🌟 {trophyCase.allStarSelections}</div>
-            </div>
-          </div>
-
-          {/* Career Points Totals */}
-          <div className="flex justify-between items-center bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs">
-            <span className="text-slate-400 font-bold">PUNTOS TOTALES CARRERA:</span>
-            <span className="font-display font-black text-xl text-white">{trophyCase.totalPoints.toLocaleString()} PTS</span>
+          <div className="bg-amber-500 text-black font-display font-black text-xl px-2.5 py-0.5 rounded-lg shadow">
+            {player.ovr} OVR
           </div>
         </div>
+
+        {/* Player Name & Info */}
+        <div className="space-y-1">
+          <div className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">#{player.jerseyNumber} • {player.position}</div>
+          <h2 className="font-display font-black text-3xl text-white uppercase leading-none">{player.name}</h2>
+          <div className="text-xs text-slate-300">{player.college} • {player.country}</div>
+        </div>
+
+        {/* Career Stat Line Box */}
+        <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 grid grid-cols-3 gap-2 text-center">
+          <div>
+            <div className="text-[9px] text-slate-400 font-bold uppercase">PUNTOS TOTALES</div>
+            <div className="font-display font-black text-xl text-amber-400">{totalCareerPoints.toLocaleString()}</div>
+          </div>
+          <div>
+            <div className="text-[9px] text-slate-400 font-bold uppercase">TEMPORADAS</div>
+            <div className="font-display font-black text-xl text-cyan-400">{totalSeasons}</div>
+          </div>
+          <div>
+            <div className="text-[9px] text-slate-400 font-bold uppercase">ANILLOS</div>
+            <div className="font-display font-black text-xl text-emerald-400">{trophyCase.championships} 💍</div>
+          </div>
+        </div>
+
+        {/* Major Trophies List */}
+        <div className="space-y-1.5 text-xs font-semibold text-slate-200">
+          {trophyCase.regularMvp > 0 && <div className="flex justify-between"><span>🏆 MVP de Temporada:</span><span className="text-amber-400 font-bold">{trophyCase.regularMvp}x</span></div>}
+          {trophyCase.finalsMvp > 0 && <div className="flex justify-between"><span>🏆 MVP de las Finales:</span><span className="text-amber-400 font-bold">{trophyCase.finalsMvp}x</span></div>}
+          {trophyCase.allStarSelections > 0 && <div className="flex justify-between"><span>🌟 Selecciones All-Star:</span><span className="text-purple-300 font-bold">{trophyCase.allStarSelections}x</span></div>}
+          {trophyCase.olympicGoldMedals > 0 && <div className="flex justify-between"><span>🥇 Medallas de Oro:</span><span className="text-amber-300 font-bold">{trophyCase.olympicGoldMedals}x</span></div>}
+        </div>
+
+        {/* Hall of Fame Stamp */}
+        <div className="pt-2 border-t border-amber-500/30 text-center">
+          <div className="text-[10px] text-amber-400 font-black tracking-widest uppercase">
+            {isHallOfFamer ? '⭐ OFICIALMENTE EN EL SALÓN DE LA FAMA ⭐' : 'CARRERA CONCLUIDA'}
+          </div>
+        </div>
+
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-        <button
-          onClick={handleDownloadImage}
-          className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-display font-black text-xl uppercase tracking-wider px-8 py-4 rounded-2xl shadow-xl shadow-amber-500/20 hover:scale-105 transition-all"
-        >
-          <Download className="w-5 h-5" />
-          <span>DESCARGAR TARJETA PNG (1-CLICK)</span>
-        </button>
-
+      {/* Restart Game Button */}
+      <div className="pt-4">
         <button
           onClick={onRestart}
-          className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-bold text-lg px-8 py-4 rounded-2xl transition-all"
+          className="bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 text-black font-display font-black text-xl uppercase tracking-wider px-10 py-4 rounded-2xl shadow-xl shadow-amber-500/20 active:scale-95 transition-all inline-flex items-center gap-2 gold-glow"
         >
-          <span>JUGAR OTRA CARRERA NBA 🏀</span>
+          <RotateCcw className="w-5 h-5 text-black" />
+          <span>INICIAR UNA NUEVA CARRERA LEGENDARIA 🏀</span>
         </button>
       </div>
+
     </div>
   );
 };

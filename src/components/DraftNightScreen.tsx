@@ -1,311 +1,147 @@
 import React, { useState } from 'react';
-import { Player, NBATeam } from '../types/game';
-import { getTeamById, NBA_TEAMS } from '../data/nbaTeams';
+import { Player, Position } from '../types/game';
+import { NBA_TEAMS, getTeamById } from '../data/nbaTeams';
 import { playAudioEffect } from '../utils/simulator';
-import { JerseyPreview } from './JerseyPreview';
-import confetti from 'canvas-confetti';
-import { Sparkles, Trophy, ArrowRight, Volume2, ShieldCheck, ListOrdered, Shuffle, ArrowRightLeft, Flame } from 'lucide-react';
+import { Sparkles, Trophy, Award, Flame, ArrowRight, Dice5, CheckCircle, Shield } from 'lucide-react';
 
 interface DraftNightScreenProps {
   player: Player;
-  onDraftComplete: (draftTeamId: string, pickNumber: number) => void;
+  onDraftComplete: (teamId: string, pickNumber: number) => void;
 }
 
-// 14 Real NBA Lottery Base Teams
-const LOTTERY_TEAMS = ['WAS', 'DET', 'POR', 'CHA', 'UTA', 'BKN', 'SAS', 'TOR', 'CHI', 'ATL', 'HOU', 'MEM', 'NOP', 'SAC'];
-const CONTENDER_SURPRISE_TEAMS = ['LAL', 'GSW', 'BOS', 'NYK', 'MIA', 'MIL', 'DAL', 'PHX', 'LAC', 'PHI', 'DEN', 'MIN'];
-const LATE_FIRST_TEAMS = ['IND', 'ORL', 'CLE', 'MIA', 'NYK', 'PHX', 'LAC', 'MIN', 'PHI', 'OKC', 'DEN', 'DAL', 'GSW', 'BOS', 'LAL'];
-
 export const DraftNightScreen: React.FC<DraftNightScreenProps> = ({ player, onDraftComplete }) => {
-  const [isRevealed, setIsRevealed] = useState(false);
-  const [showTradeOfferModal, setShowTradeOfferModal] = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [draftedTeamId, setDraftedTeamId] = useState<string | null>(null);
+  const [pickNumber, setPickNumber] = useState<number | null>(null);
 
-  // Build 14-team Draft Board with dynamic surprise lottery jumps anywhere in Picks #1 through #14
-  const [draftBoard] = useState(() => {
-    const board = LOTTERY_TEAMS.map((tId, idx) => ({
-      pick: idx + 1,
-      team: getTeamById(tId),
-      isSurpriseJump: false,
-    }));
+  // 25% Random Wildcard Lottery Jump to Top Picks!
+  const handleStartDraftLottery = () => {
+    setIsSimulating(true);
+    playAudioEffect('badge');
 
-    // 40% chance of 1 to 3 contender/big market teams jumping into ANY of the 14 Lottery Picks
-    if (Math.random() < 0.40) {
-      const numberOfJumps = Math.floor(Math.random() * 2) + 1; // 1 to 2 teams jump
-      const usedPicks = new Set<number>();
-      const usedTeams = new Set<string>();
+    setTimeout(() => {
+      // Full 30 team shuffle
+      const shuffledTeams = [...NBA_TEAMS].sort(() => 0.5 - Math.random());
+      
+      let finalPick = 1;
+      let finalTeam = shuffledTeams[0];
 
-      for (let i = 0; i < numberOfJumps; i++) {
-        // Pick a random lottery pick position between 1 and 14
-        const surprisePickIndex = Math.floor(Math.random() * 14);
-        if (usedPicks.has(surprisePickIndex)) continue;
-
-        // Pick a random contender/big market team
-        const availableContenders = CONTENDER_SURPRISE_TEAMS.filter(t => !usedTeams.has(t));
-        if (availableContenders.length === 0) break;
-
-        const randomContenderId = availableContenders[Math.floor(Math.random() * availableContenders.length)];
-        
-        board[surprisePickIndex] = {
-          pick: surprisePickIndex + 1,
-          team: getTeamById(randomContenderId),
-          isSurpriseJump: true,
-        };
-
-        usedPicks.add(surprisePickIndex);
-        usedTeams.add(randomContenderId);
+      // Tier influence on pick probability
+      if (player.prospectTier === '5_STAR') {
+        finalPick = Math.floor(Math.random() * 3) + 1; // Top 1-3
+      } else if (player.prospectTier === '4_STAR') {
+        finalPick = Math.floor(Math.random() * 11) + 4; // Pick 4-14
+      } else if (player.prospectTier === 'UNDERRATED') {
+        finalPick = Math.floor(Math.random() * 16) + 15; // Pick 15-30
+      } else {
+        finalPick = Math.floor(Math.random() * 8) + 3; // International Pick 3-10
       }
-    }
 
-    return board;
-  });
+      // 25% Random Wildcard Lottery Jump!
+      if (Math.random() < 0.25) {
+        finalPick = Math.floor(Math.random() * 3) + 1;
+      }
 
-  // Dynamic Pick Determination based on Prospect Tier & OVR
-  const calculateDraftPickAndTeam = (): { pickNumber: number; teamId: string } => {
-    let pick = 1;
+      finalTeam = shuffledTeams[finalPick - 1] || shuffledTeams[0];
 
-    if (player.prospectTier === '5_STAR') {
-      pick = player.ovr >= 78 ? 1 : player.ovr >= 76 ? 2 : 3;
-    } else if (player.prospectTier === 'OVERSEAS') {
-      pick = player.ovr >= 76 ? 3 : player.ovr >= 74 ? 7 : 11;
-    } else if (player.prospectTier === '4_STAR') {
-      pick = player.ovr >= 76 ? 4 : player.ovr >= 73 ? 8 : 14;
-    } else {
-      // UNDERRATED (3-Star)
-      pick = player.ovr >= 73 ? 12 : player.ovr >= 70 ? 20 : 28;
-    }
-
-    // Add random variance (+/- 1 or 2 picks)
-    const variance = Math.floor(Math.random() * 3) - 1;
-    pick = Math.max(1, Math.min(60, pick + variance));
-
-    // Team selection according to pick number from actual draft board
-    let teamId = 'DET';
-    if (pick <= 14 && draftBoard[pick - 1]) {
-      teamId = draftBoard[pick - 1].team.id;
-    } else {
-      const idx = (pick - 15) % LATE_FIRST_TEAMS.length;
-      teamId = LATE_FIRST_TEAMS[idx];
-    }
-
-    return { pickNumber: pick, teamId };
+      setDraftedTeamId(finalTeam.id);
+      setPickNumber(finalPick);
+      setIsSimulating(false);
+      playAudioEffect('cheer');
+    }, 2200);
   };
 
-  const [{ pickNumber, teamId: initialDraftTeamId }] = useState(calculateDraftPickAndTeam);
-  const draftingTeam: NBATeam = getTeamById(initialDraftTeamId);
-
-  // Check for Random Draft Night Trade (35% probability)
-  const [tradeDestinationTeam] = useState<NBATeam | null>(() => {
-    if (Math.random() < 0.35) {
-      const potentialTradeTeams = NBA_TEAMS.filter(t => t.id !== initialDraftTeamId);
-      return potentialTradeTeams[Math.floor(Math.random() * potentialTradeTeams.length)];
-    }
-    return null;
-  });
-
-  const [activeTeam, setActiveTeam] = useState<NBATeam>(draftingTeam);
-
-  const handleRevealPick = () => {
-    setIsRevealed(true);
-    playAudioEffect('draft_buzzer');
-
-    try {
-      confetti({
-        particleCount: 140,
-        spread: 90,
-        origin: { y: 0.6 },
-        colors: [draftingTeam.primaryColor, draftingTeam.secondaryColor, '#F59E0B'],
-      });
-    } catch (_) {}
-
-    // Trigger trade offer modal if trade destination exists
-    if (tradeDestinationTeam) {
-      setTimeout(() => {
-        setShowTradeOfferModal(true);
-      }, 1200);
+  const handleConfirmTeam = () => {
+    if (draftedTeamId && pickNumber) {
+      onDraftComplete(draftedTeamId, pickNumber);
     }
   };
 
-  const handleAcceptTrade = () => {
-    if (tradeDestinationTeam) {
-      setActiveTeam(tradeDestinationTeam);
-      setShowTradeOfferModal(false);
-      playAudioEffect('cash');
-    }
-  };
-
-  const handleDeclineTrade = () => {
-    setShowTradeOfferModal(false);
-  };
+  const draftedTeam = draftedTeamId ? getTeamById(draftedTeamId) : null;
 
   return (
-    <div className="max-w-5xl mx-auto p-3 sm:p-6 my-2 sm:my-4">
-      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-10 backdrop-blur-md shadow-2xl text-center space-y-8 relative overflow-hidden">
+    <div className="max-w-5xl mx-auto p-3 sm:p-6 my-2 sm:my-6">
+      <div className="game-card-panel border border-slate-700/80 rounded-3xl p-5 sm:p-8 shadow-2xl space-y-6 holographic-edge">
         
-        {/* Background Glow */}
-        <div 
-          className="absolute -top-32 -left-32 w-96 h-96 rounded-full blur-3xl opacity-20"
-          style={{ backgroundColor: activeTeam.primaryColor }}
-        ></div>
-
-        {/* Barclays Center Header */}
-        <div className="space-y-2 relative z-10">
-          <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold px-3.5 py-1 rounded-full uppercase tracking-wider">
-            <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
-            <span>BARCLAYS CENTER • BROOKLYN, NY</span>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div>
+            <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider mb-1">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span>BARCLAYS CENTER • BROOKLYN, NEW YORK 🗽</span>
+            </div>
+            <h2 className="font-display text-4xl sm:text-6xl font-black text-white uppercase tracking-tight">
+              NOCHE DEL DRAFT NBA {new Date().getFullYear() + 1}
+            </h2>
+            <p className="text-xs text-slate-400">Adam Silver sube al podio para anunciar la selección oficial de tu franquicia.</p>
           </div>
-          <h1 className="font-display text-4xl sm:text-7xl font-black text-white uppercase tracking-tight">
-            NOCHE DEL NBA DRAFT
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
-            El Comisionado de la NBA, Adam Silver, se dirige al podio para anunciar las elecciones oficiales de la 1ª Ronda.
-          </p>
+
+          <div className="bg-slate-950 border border-slate-800 px-4 py-2 rounded-2xl text-right">
+            <div className="text-[10px] text-slate-400 font-bold uppercase">PROSPECTO DE DRAFT</div>
+            <div className="font-bold text-white text-sm">{player.name} ({player.position})</div>
+            <div className="text-xs text-amber-400 font-bold">{player.college} • {player.ovr} OVR</div>
+          </div>
         </div>
 
-        {/* DRAFT NIGHT TRADE ALERT MODAL */}
-        {showTradeOfferModal && tradeDestinationTeam && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fadeIn">
-            <div className="bg-slate-900 border-2 border-red-500/80 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 text-center shadow-2xl relative">
-              <div className="inline-flex items-center gap-2 bg-red-500/20 text-red-400 border border-red-500/40 text-xs font-black uppercase px-4 py-1.5 rounded-full animate-bounce">
-                <ArrowRightLeft className="w-4 h-4 text-red-400" />
-                <span>🚨 TRASPASO INMEDIATO EN LA NOCHE DEL DRAFT</span>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-display text-3xl font-black text-white uppercase">
-                  ¡TUS DERECHOS HAN SIDO TRASPASADOS!
-                </h3>
-                <p className="text-xs text-slate-300 leading-relaxed bg-slate-950 p-4 rounded-2xl border border-slate-800 italic">
-                  "Los <strong className="text-amber-400">{draftingTeam.name}</strong> han acordado enviar tus derechos de novato a los <strong className="text-emerald-400">{tradeDestinationTeam.city} {tradeDestinationTeam.name}</strong> a cambio de 2 selecciones futuras de 1ª ronda y dinero."
-                </p>
-              </div>
-
-              {/* Trade Visual Comparison */}
-              <div className="grid grid-cols-2 gap-3 items-center bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                <div className="space-y-1">
-                  <img src={draftingTeam.logoUrl} alt="" className="w-10 h-10 object-contain mx-auto" />
-                  <div className="text-[10px] text-slate-400 font-bold">{draftingTeam.name}</div>
-                </div>
-                <div className="space-y-1">
-                  <img src={tradeDestinationTeam.logoUrl} alt="" className="w-10 h-10 object-contain mx-auto" />
-                  <div className="text-[10px] text-emerald-400 font-bold">{tradeDestinationTeam.name}</div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={handleAcceptTrade}
-                  className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-black font-display font-black text-base uppercase py-3.5 rounded-xl shadow-lg transition-all"
-                >
-                  ✈️ ACEPTAR TRASPASO Y PONERSE LA GORRA DE {tradeDestinationTeam.name.toUpperCase()}
-                </button>
-
-                <button
-                  onClick={handleDeclineTrade}
-                  className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-3 rounded-xl transition-all"
-                >
-                  ✍️ RECHAZAR TRASPASO Y PERMANECER EN {draftingTeam.name.toUpperCase()}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Unrevealed Podium Screen & Live Draft Board */}
-        {!isRevealed ? (
-          <div className="space-y-6 relative z-10">
-            
-            {/* Live NBA Draft Board Preview (All picks neutral to maintain full suspense!) */}
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 max-w-3xl mx-auto space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <span className="text-xs font-bold text-amber-400 uppercase flex items-center gap-1.5">
-                  <ListOrdered className="w-4 h-4 text-amber-400" />
-                  <span>TABLA OFICIAL DE LOTERÍA DEL DRAFT (PICKS 1-14)</span>
-                </span>
-                <span className="text-[10px] text-slate-400 font-semibold">1ª RONDA EN PROGRESO</span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-7 gap-2">
-                {draftBoard.map(b => (
-                  <div
-                    key={b.pick}
-                    className={`p-2 rounded-xl border text-center transition-all ${
-                      b.isSurpriseJump
-                        ? 'border-amber-500/80 bg-amber-500/10 shadow-lg'
-                        : 'border-slate-800 bg-slate-900/90'
-                    }`}
-                  >
-                    <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400 font-bold">
-                      <span>PICK #{b.pick}</span>
-                      {b.isSurpriseJump && <Flame className="w-3 h-3 text-amber-400" />}
-                    </div>
-                    <img src={b.team.logoUrl} alt={b.team.name} className="w-6 h-6 object-contain mx-auto my-1 drop-shadow" />
-                    <div className="text-[9px] font-bold text-white truncate">{b.team.abbreviation}</div>
-                  </div>
-                ))}
-              </div>
+        {/* REVEAL CARD AREA */}
+        {!draftedTeam ? (
+          <div className="text-center py-10 space-y-6">
+            <div className="w-24 h-24 rounded-3xl bg-slate-950 border-2 border-amber-500/40 mx-auto flex items-center justify-center text-4xl gold-glow animate-float">
+              🎩
             </div>
 
-            {/* Green Room Envelope Card */}
-            <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md mx-auto space-y-5 shadow-xl">
-              <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-2xl mx-auto flex items-center justify-center text-3xl">
-                ✉️
-              </div>
-              
-              <div className="space-y-1">
-                <h3 className="font-display font-black text-2xl text-white uppercase">
-                  {player.name || 'TU PROSPECTO'} • GREEN ROOM
-                </h3>
-                <p className="text-xs text-amber-300 font-semibold">
-                  Proyección: {player.prospectTier === '5_STAR' ? 'Top 3 Garantizado' : player.prospectTier === '4_STAR' ? 'Lotería Top 14' : 'Primera Ronda'}
-                </p>
-              </div>
+            <div className="space-y-2 max-w-md mx-auto">
+              <h3 className="font-display text-3xl font-black text-white uppercase">
+                {isSimulating ? 'SIMULANDO LOTERÍA DEL DRAFT...' : '¡EL PODIO ESTÁ LISTO!'}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {isSimulating
+                  ? 'Analizando necesidades de las 30 franquicias y combinaciones de lotería...'
+                  : 'Haz clic para revelar el pick oficial y el equipo que seleccionará tu talento.'}
+              </p>
+            </div>
 
-              <div className="py-2">
-                <JerseyPreview name={player.name} jerseyNumber={player.jerseyNumber} countryName={player.country} size="sm" />
-              </div>
-
+            {!isSimulating && (
               <button
-                onClick={handleRevealPick}
-                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-display font-black text-xl uppercase tracking-wider py-4 rounded-2xl shadow-xl shadow-amber-500/20 active:scale-95 transition-all"
+                onClick={handleStartDraftLottery}
+                className="bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 text-black font-display font-black text-2xl uppercase tracking-wider px-12 py-4 rounded-2xl shadow-2xl shadow-amber-500/30 active:scale-95 transition-all inline-flex items-center gap-3 gold-glow"
               >
-                ESCUCHAR ANUNCIO DE ADAM SILVER 🎙️
+                <span>REVELAR SELECCIÓN EN EL DRAFT</span>
+                <ArrowRight className="w-6 h-6" />
               </button>
-            </div>
+            )}
           </div>
         ) : (
-          /* REVEALED PICK SCREEN */
-          <div className="bg-gradient-to-b from-slate-950 to-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-10 max-w-lg mx-auto space-y-6 shadow-2xl relative z-10 animate-fadeIn">
-            
-            {/* Team Logo Badge */}
-            <div
-              className="w-28 h-28 rounded-3xl mx-auto flex items-center justify-center p-4 border-2 bg-slate-950 shadow-2xl"
-              style={{ borderColor: activeTeam.secondaryColor }}
-            >
-              <img src={activeTeam.logoUrl} alt={activeTeam.name} className="w-full h-full object-contain drop-shadow-lg" />
-            </div>
-
-            <div className="space-y-3">
-              <div className="text-amber-400 font-display font-black text-3xl sm:text-4xl uppercase tracking-wider">
-                PICK #{pickNumber} • SELECCIÓN OFICIAL
+          /* REVEALED DRAFT CARD RESULT */
+          <div className="space-y-6 animate-fadeIn py-4">
+            <div className="game-card-gold rounded-3xl p-6 border-2 border-amber-400/80 text-center space-y-4 max-w-xl mx-auto holographic-edge gold-glow">
+              
+              <div className="inline-flex items-center gap-2 bg-amber-500 text-black font-display font-black text-sm px-4 py-1 rounded-full uppercase tracking-wider">
+                <span>PICK #{pickNumber} GENERAL DEL DRAFT</span>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 italic text-sm text-slate-200 shadow-inner">
-                "With the {pickNumber}{pickNumber === 1 ? 'st' : pickNumber === 2 ? 'nd' : pickNumber === 3 ? 'rd' : 'th'} pick in the NBA Draft, the <strong className="text-amber-400 font-bold">{activeTeam.city} {activeTeam.name}</strong> select <strong className="text-white font-bold">{player.name}</strong>, from {player.college}!"
+              <div className="w-24 h-24 mx-auto p-2 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center">
+                <img src={draftedTeam.logoUrl} alt={draftedTeam.name} className="w-full h-full object-contain drop-shadow" />
               </div>
+
+              <div className="space-y-1">
+                <div className="text-xs text-amber-300 font-bold uppercase">{draftedTeam.city}</div>
+                <h3 className="font-display font-black text-4xl text-white uppercase">{draftedTeam.name}</h3>
+                <p className="text-xs text-slate-300 max-w-md mx-auto italic bg-slate-950/60 p-3 rounded-xl border border-slate-800 mt-2">
+                  "Con la selección #{pickNumber} del Draft NBA, los {draftedTeam.name} seleccionan a {player.name}, de {player.college}."
+                </p>
+              </div>
+
             </div>
 
-            {/* Render Visual NBA Team Jersey */}
-            <div className="py-2">
-              <JerseyPreview name={player.name} jerseyNumber={player.jerseyNumber} teamId={activeTeam.id} size="md" />
+            <div className="text-center pt-2">
+              <button
+                onClick={handleConfirmTeam}
+                className="bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 text-black font-display font-black text-xl uppercase tracking-wider px-10 py-4 rounded-2xl shadow-xl shadow-amber-500/20 active:scale-95 transition-all inline-flex items-center gap-2"
+              >
+                <span>FIRMAR CONTRATO & COMENZAR MI TEMPORADA ROOKIE 🏀</span>
+              </button>
             </div>
-
-            <button
-              onClick={() => onDraftComplete(activeTeam.id, pickNumber)}
-              className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-display font-black text-xl uppercase tracking-wider py-4 rounded-2xl shadow-xl shadow-amber-500/20 active:scale-95 transition-all"
-            >
-              <span>PONERSE LA GORRA DE LOS {activeTeam.name.toUpperCase()}</span>
-              <ArrowRight className="w-5 h-5" />
-            </button>
           </div>
         )}
 
