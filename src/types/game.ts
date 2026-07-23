@@ -46,6 +46,7 @@ export interface PlayerInvestment {
   annualIncomeMillions: number;
   marketabilityBonus: number;
   reputationBonus?: number;
+  attributeBoosts?: Partial<PlayerAttributes>;
   isTemporaryOneYear?: boolean;
   icon: string;
   bought: boolean;
@@ -145,7 +146,7 @@ export interface CareerEvent {
   maxOvr?: number;
   minAge?: number;
   description: string;
-  category: 'on_court' | 'contract' | 'media' | 'offseason' | 'rivalry' | 'injury' | 'lifestyle';
+  category: 'on_court' | 'contract' | 'media' | 'offseason' | 'rivalry' | 'injury' | 'lifestyle' | 'international' | 'off_court' | 'legacy' | 'business';
   choices: EventChoice[];
 }
 
@@ -170,7 +171,11 @@ export interface SeasonStats {
   wasTraded: boolean;
   tradeNarrative?: string;
   awardsWon: string[];
+  developmentNarrative?: string;   // OVR growth/decline/injury narrative
+  injuryOccurred?: boolean;        // True if a significant injury happened
+  ovrAtEndOfSeason?: number;       // OVR after development this season
 }
+
 
 export interface TrophyCase {
   championships: number;
@@ -199,4 +204,5 @@ export type GamePhase =
   | 'COMBINE_TESTS' 
   | 'DRAFT_NIGHT' 
   | 'SEASON_DASHBOARD' 
-  | 'HALL_OF_FAME';
+  | 'HALL_OF_FAME' 
+  | 'QUICK_START';

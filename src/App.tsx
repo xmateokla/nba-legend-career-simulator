@@ -3,7 +3,8 @@ import { GamePhase, Player, SeasonStats, TrophyCase } from './types/game';
 import { Navbar } from './components/Navbar';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { ProspectCreator } from './components/ProspectCreator';
-import { CombineTests } from './components/CombineTests';
+import { QuickStartCreator } from './components/QuickStartCreator';
+import { CombineTestsScreen } from './components/CombineTestsScreen';
 import { DraftNightScreen } from './components/DraftNightScreen';
 import { CareerDashboard } from './components/CareerDashboard';
 import { TradingCardExport } from './components/TradingCardExport';
@@ -62,12 +63,39 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0B0F19]">
-      <Navbar player={player} seasonYear={seasonYear} onReset={handleResetGame} />
+    <div className="min-h-screen flex flex-col bg-[#050811]">
+      {player && phase !== 'WELCOME' && phase !== 'HALL_OF_FAME' && (
+        <Navbar
+          player={player}
+          trophies={trophyCase}
+          currentYear={seasonYear}
+          onResetGame={handleResetGame}
+          onOpenLifestyleStore={() => {}}
+        />
+      )}
 
       <main className="flex-1">
         {phase === 'WELCOME' && (
-          <WelcomeScreen onStart={() => setPhase('PROSPECT_CREATION')} />
+          <WelcomeScreen
+            onStart={() => setPhase('PROSPECT_CREATION')}
+            onQuickStart={() => setPhase('QUICK_START')}
+          />
+        )}
+
+        {phase === 'QUICK_START' && (
+          <QuickStartCreator
+            onComplete={createdPlayer => {
+              // Assign a random team for quick start
+              const teamIds = ['lakers', 'celtics', 'warriors', 'bulls', 'heat', 'nuggets', 'suns', 'bucks', 'clippers', 'mavs'];
+              const randomTeam = teamIds[Math.floor(Math.random() * teamIds.length)];
+              setPlayer({
+                ...createdPlayer,
+                currentTeamId: randomTeam,
+                draftTeamId: randomTeam,
+              });
+              setPhase('SEASON_DASHBOARD');
+            }}
+          />
         )}
 
         {phase === 'PROSPECT_CREATION' && (
@@ -80,9 +108,9 @@ export const App: React.FC = () => {
         )}
 
         {phase === 'COMBINE_TESTS' && player && (
-          <CombineTests
+          <CombineTestsScreen
             player={player}
-            onComplete={updatedPlayer => {
+            onCombineComplete={updatedPlayer => {
               setPlayer(updatedPlayer);
               setPhase('DRAFT_NIGHT');
             }}
